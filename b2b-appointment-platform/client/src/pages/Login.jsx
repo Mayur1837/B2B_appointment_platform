@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import Loader from "../components/Loader";
 
 export default function Login() {
   const { login, user } = useAuth();
@@ -99,9 +100,7 @@ export default function Login() {
         </section>
         <section className="mt-8">
           {loadingBusinesses ? (
-            <div className="rounded-2xl bg-white p-6 text-slate-500 shadow-sm ring-1 ring-slate-200">
-              Loading available businesses…
-            </div>
+            <Loader label="Loading available businesses..." />
           ) : businesses.length === 0 ? (
             <div className="rounded-2xl bg-white p-6 text-slate-500 shadow-sm ring-1 ring-slate-200">
               No active businesses are available for public booking yet.
