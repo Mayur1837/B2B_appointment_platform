@@ -17,15 +17,50 @@ function assertTimeRange(startTime, endTime) {
     throw new AppError("End time must be after start time", 400);
 }
 
+// function validateAvailabilityItem(item) {
+//   if (!DATE_RE.test(item.date || ""))
+//     throw new AppError("Availability date must use YYYY-MM-DD format", 400);
+//   const parsed = new Date(`${item.date}T00:00:00.000Z`);
+//   if (
+//     Number.isNaN(parsed.getTime()) ||
+//     parsed.toISOString().slice(0, 10) !== item.date
+//   )
+//     throw new AppError("Invalid availability date", 400);
+//   assertTimeRange(item.startTime, item.endTime);
+// }
 function validateAvailabilityItem(item) {
-  if (!DATE_RE.test(item.date || ""))
-    throw new AppError("Availability date must use YYYY-MM-DD format", 400);
-  const parsed = new Date(`${item.date}T00:00:00.000Z`);
-  if (
-    Number.isNaN(parsed.getTime()) ||
-    parsed.toISOString().slice(0, 10) !== item.date
-  )
-    throw new AppError("Invalid availability date", 400);
+  const mode = item.mode || "DATE";
+
+  if (!["DATE", "WEEKLY"].includes(mode)) {
+    throw new AppError("Availability mode must be DATE or WEEKLY", 400);
+  }
+
+  if (mode === "DATE") {
+    if (!DATE_RE.test(item.date || "")) {
+      throw new AppError("Availability date must use YYYY-MM-DD format", 400);
+    }
+
+    const parsed = new Date(`${item.date}T00:00:00.000Z`);
+
+    if (
+      Number.isNaN(parsed.getTime()) ||
+      parsed.toISOString().slice(0, 10) !== item.date
+    ) {
+      throw new AppError("Invalid availability date", 400);
+    }
+  }
+
+  if (mode === "WEEKLY") {
+    const day = Number(item.dayOfWeek);
+
+    if (!Number.isInteger(day) || day < 0 || day > 6) {
+      throw new AppError(
+        "Weekly availability requires a valid day of week",
+        400,
+      );
+    }
+  }
+
   assertTimeRange(item.startTime, item.endTime);
 }
 
@@ -118,8 +153,19 @@ export async function createService(req, res) {
       );
       if (availability.length) {
         await Availability.insertMany(
+          // availability.map((item) => ({
+          //   ...item,
+          //   tenantId: req.tenantId,
+          //   serviceId: service._id,
+          //   active: true,
+          // })),
           availability.map((item) => ({
-            ...item,
+            mode: item.mode || "DATE",
+            ...(item.mode === "WEEKLY"
+              ? { dayOfWeek: Number(item.dayOfWeek) }
+              : { date: item.date }),
+            startTime: item.startTime,
+            endTime: item.endTime,
             tenantId: req.tenantId,
             serviceId: service._id,
             active: true,
@@ -131,7 +177,8 @@ export async function createService(req, res) {
   } catch (error) {
     if (error?.code === 11000)
       throw new AppError(
-        "Duplicate availability window for this service and date",
+        // "Duplicate availability window for this service and date",
+        "Duplicate availability window for this service",
         409,
       );
     throw error;
@@ -215,32 +262,85 @@ export async function listAvailability(req, res) {
   res.json({
     availability: await Availability.find(query)
       .populate("serviceId", "name")
-      .sort({ date: 1, startTime: 1 })
+      // .sort({ date: 1, startTime: 1 })
+      .sort({ mode: 1, dayOfWeek: 1, date: 1, startTime: 1 })
       .lean(),
   });
 }
 
+// export async function createAvailability(req, res) {
+//   const { serviceId, date, startTime, endTime } = req.body;
+//   if (!(await Service.exists({ _id: serviceId, tenantId: req.tenantId })))
+//     throw new AppError("Service not found", 404);
+//   validateAvailabilityItem({ date, startTime, endTime });
+//   try {
+//     const availability = await Availability.create({
+//       tenantId: req.tenantId,
+//       serviceId,
+//       date,
+//       startTime,
+//       endTime,
+//       active: true,
+//     });
+//     res.status(201).json({ availability });
+//   } catch (error) {
+//     if (error?.code === 11000)
+//       throw new AppError(
+//         "This service already has the same availability window on this date",
+//         409,
+//       );
+//     throw error;
+//   }
+// }
 export async function createAvailability(req, res) {
-  const { serviceId, date, startTime, endTime } = req.body;
-  if (!(await Service.exists({ _id: serviceId, tenantId: req.tenantId })))
+  const {
+    serviceId,
+    mode = "DATE",
+    date,
+    dayOfWeek,
+    startTime,
+    endTime,
+  } = req.body;
+
+  if (
+    !(await Service.exists({
+      _id: serviceId,
+      tenantId: req.tenantId,
+    }))
+  ) {
     throw new AppError("Service not found", 404);
-  validateAvailabilityItem({ date, startTime, endTime });
+  }
+
+  const item = {
+    mode,
+    date,
+    dayOfWeek,
+    startTime,
+    endTime,
+  };
+
+  validateAvailabilityItem(item);
+
   try {
     const availability = await Availability.create({
       tenantId: req.tenantId,
       serviceId,
-      date,
+      mode,
+      ...(mode === "WEEKLY" ? { dayOfWeek: Number(dayOfWeek) } : { date }),
       startTime,
       endTime,
       active: true,
     });
+
     res.status(201).json({ availability });
   } catch (error) {
-    if (error?.code === 11000)
+    if (error?.code === 11000) {
       throw new AppError(
-        "This service already has the same availability window on this date",
+        "This service already has the same availability window",
         409,
       );
+    }
+
     throw error;
   }
 }
