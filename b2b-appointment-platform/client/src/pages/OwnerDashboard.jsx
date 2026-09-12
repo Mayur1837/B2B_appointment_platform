@@ -58,6 +58,7 @@ import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import Loader from "../components/Loader";
 
 const emptyForm = {
   name: "",
@@ -75,11 +76,28 @@ export default function OwnerDashboard() {
   const [message, setMessage] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const load = () =>
-    api("/owner/businesses", { token }).then((x) => setItems(x.businesses));
+  // const load = () =>
+  //   api("/owner/businesses", { token }).then((x) => setItems(x.businesses));
+  const load = async () => {
+    setLoading(true);
+
+    try {
+      const x = await api("/owner/businesses", {
+        token,
+      });
+
+      setItems(x.businesses);
+    } finally {
+      setLoading(false);
+    }
+  };
+  // useEffect(() => {
+  //   load().catch((e) => setMessage(e.message));
+  // }, []);
   useEffect(() => {
-    load().catch((e) => setMessage(e.message));
+    load();
   }, []);
   const update = (key, value) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -252,10 +270,15 @@ export default function OwnerDashboard() {
               </div>
             </div>
             <div className="space-y-3">
-              {items.length === 0 ? (
+              {/* {items.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
                   No businesses onboarded yet.
                 </div>
+              ) : ( */}
+              {loading ? (
+                <Loader label="Loading businesses..." />
+              ) : items.length === 0 ? (
+                <div>No businesses yet.</div>
               ) : (
                 items.map((business) => {
                   const active = business.status === "ACTIVE";

@@ -7,11 +7,30 @@ import {
 } from "../utils/booking.js";
 
 export async function getAvailableSlots({ tenantId, service, date, timeZone }) {
+  // const rules = await Availability.find({
+  //   tenantId,
+  //   serviceId: service._id,
+  //   date,
+  //   active: true,
+  // })
+  //   .sort({ startTime: 1 })
+  //   .lean();
+  const weekday = new Date(`${date}T12:00:00.000Z`).getUTCDay();
+
   const rules = await Availability.find({
     tenantId,
     serviceId: service._id,
-    date,
     active: true,
+    $or: [
+      {
+        mode: "DATE",
+        date,
+      },
+      {
+        mode: "WEEKLY",
+        dayOfWeek: weekday,
+      },
+    ],
   })
     .sort({ startTime: 1 })
     .lean();
