@@ -34,6 +34,34 @@ const schema = new mongoose.Schema(
       default: "CONFIRMED",
     },
     cancelToken: { type: String, required: true, unique: true, index: true },
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+
+    cancelledByUser: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    cancelledByRole: {
+      type: String,
+      enum: [
+        "CUSTOMER",
+        "BUSINESS_ADMIN",
+        "SYSTEM_OWNER",
+        "SYSTEM",
+        "BOOKING_LINK",
+      ],
+      default: null,
+    },
+
+    cancelledByName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
   },
   { timestamps: true },
 );

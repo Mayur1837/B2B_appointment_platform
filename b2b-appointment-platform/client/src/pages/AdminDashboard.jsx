@@ -152,12 +152,28 @@ export default function AdminDashboard() {
       setBusy(false);
     }
   };
+  const refreshAppointments = async () => {
+    try {
+      setError("");
+      setLoading(true);
+
+      const a = await api("/business/appointments", { token });
+
+      setAppts(a.appointments);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredAppointments = useMemo(
     () =>
       appointmentFilter === "ALL"
-        ? appts
-        : appts.filter((a) => a.status === appointmentFilter),
+        ? appts || []
+        : (appts || []).filter(
+            (a) => String(a.status || "").toUpperCase() === appointmentFilter,
+          ),
     [appts, appointmentFilter],
   );
 
@@ -280,81 +296,7 @@ export default function AdminDashboard() {
                       </span>
                     </label>
                   </div>
-                  {/* <div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold">Service availability</h3>
-                    <p className="text-xs text-slate-500">
-                      Add one or more date/time windows for this service.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addServiceSlot}
-                    className="rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-slate-50"
-                  >
-                    + Add date
-                  </button>
-                </div>
-                <div className="mt-3 space-y-3">
-                  {serviceSlots.map((slot, index) => (
-                    <div
-                      key={index}
-                      className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end"
-                    >
-                      <label className="text-xs font-semibold text-slate-600">
-                        Date
-                        <input
-                          required
-                          min={today}
-                          type="date"
-                          className="mt-1 w-full rounded-lg border bg-white p-2.5 font-normal"
-                          value={slot.date}
-                          onChange={(e) =>
-                            updateServiceSlot(index, "date", e.target.value)
-                          }
-                        />
-                      </label>
-                      <label className="text-xs font-semibold text-slate-600">
-                        Start
-                        <input
-                          required
-                          type="time"
-                          className="mt-1 w-full rounded-lg border bg-white p-2.5 font-normal"
-                          value={slot.startTime}
-                          onChange={(e) =>
-                            updateServiceSlot(
-                              index,
-                              "startTime",
-                              e.target.value,
-                            )
-                          }
-                        />
-                      </label>
-                      <label className="text-xs font-semibold text-slate-600">
-                        End
-                        <input
-                          required
-                          type="time"
-                          className="mt-1 w-full rounded-lg border bg-white p-2.5 font-normal"
-                          value={slot.endTime}
-                          onChange={(e) =>
-                            updateServiceSlot(index, "endTime", e.target.value)
-                          }
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        disabled={serviceSlots.length === 1}
-                        onClick={() => removeServiceSlot(index)}
-                        className="rounded-lg px-3 py-2 text-sm text-red-600 disabled:text-slate-300"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div> */}
+
                   <div>
                     <div>
                       <h3 className="font-semibold">Service availability</h3>
@@ -553,82 +495,6 @@ export default function AdminDashboard() {
                     Create your first service to add availability.
                   </div>
                 ) : (
-                  // <form
-                  //   className="mt-6 space-y-4"
-                  //   onSubmit={(e) => {
-                  //     e.preventDefault();
-                  //     run(() =>
-                  //       api("/business/availability", {
-                  //         method: "POST",
-                  //         token,
-                  //         body: { serviceId: extraServiceId, ...extraSlot },
-                  //       }),
-                  //     );
-                  //   }}
-                  // >
-                  //   <label className="block text-sm font-medium">
-                  //     Service
-                  //     <select
-                  //       className="mt-2 w-full rounded-xl border p-3"
-                  //       value={extraServiceId}
-                  //       onChange={(e) => setExtraServiceId(e.target.value)}
-                  //     >
-                  //       {services.map((s) => (
-                  //         <option key={s._id} value={s._id}>
-                  //           {s.name}
-                  //         </option>
-                  //       ))}
-                  //     </select>
-                  //   </label>
-                  //   <div className="grid gap-3 sm:grid-cols-3">
-                  //     <label className="text-sm font-medium">
-                  //       Date
-                  //       <input
-                  //         required
-                  //         min={today}
-                  //         type="date"
-                  //         className="mt-2 w-full rounded-xl border p-3 font-normal"
-                  //         value={extraSlot.date}
-                  //         onChange={(e) =>
-                  //           setExtraSlot({ ...extraSlot, date: e.target.value })
-                  //         }
-                  //       />
-                  //     </label>
-                  //     <label className="text-sm font-medium">
-                  //       Start
-                  //       <input
-                  //         required
-                  //         type="time"
-                  //         className="mt-2 w-full rounded-xl border p-3 font-normal"
-                  //         value={extraSlot.startTime}
-                  //         onChange={(e) =>
-                  //           setExtraSlot({
-                  //             ...extraSlot,
-                  //             startTime: e.target.value,
-                  //           })
-                  //         }
-                  //       />
-                  //     </label>
-                  //     <label className="text-sm font-medium">
-                  //       End
-                  //       <input
-                  //         required
-                  //         type="time"
-                  //         className="mt-2 w-full rounded-xl border p-3 font-normal"
-                  //         value={extraSlot.endTime}
-                  //         onChange={(e) =>
-                  //           setExtraSlot({ ...extraSlot, endTime: e.target.value })
-                  //         }
-                  //       />
-                  //     </label>
-                  //   </div>
-                  //   <button
-                  //     disabled={busy}
-                  //     className="w-full rounded-xl border border-slate-300 p-3 font-semibold hover:bg-slate-50 disabled:opacity-50"
-                  //   >
-                  //     Add availability
-                  //   </button>
-                  // </form>
                   <form
                     className="mt-6 space-y-4"
                     onSubmit={(e) => {
@@ -929,6 +795,14 @@ export default function AdminDashboard() {
                   </p>
                   <h2 className="mt-1 text-xl font-bold">Appointments</h2>
                 </div>
+                <button
+                  type="button"
+                  onClick={refreshAppointments}
+                  disabled={loading || busy}
+                  className="rounded-lg border px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Refresh
+                </button>
                 <select
                   className="rounded-lg border p-2.5 text-sm"
                   value={appointmentFilter}
@@ -942,12 +816,14 @@ export default function AdminDashboard() {
                 </select>
               </div>
               <div className="mt-5 space-y-3">
-                {filteredAppointments.length === 0 && (
+                {/* {filteredAppointments.length === 0 && ( */}
+                {(filteredAppointments || []).length === 0 && (
                   <div className="rounded-xl bg-slate-50 p-5 text-sm text-slate-500">
                     No appointments match this filter.
                   </div>
                 )}
-                {filteredAppointments.map((a) => (
+                {/* {filteredAppointments.map((a) => ( */}
+                {(filteredAppointments || []).map((a) => (
                   <div
                     key={a._id}
                     className="flex flex-col gap-4 rounded-xl border border-slate-200 p-4 md:flex-row md:items-center md:justify-between"
@@ -960,6 +836,34 @@ export default function AdminDashboard() {
                         {new Date(a.startAt).toLocaleString()} ·{" "}
                         {a.customerEmail}
                       </div>
+                      <div className="mt-2">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
+                            a.status === "CONFIRMED"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : a.status === "CANCELLED"
+                                ? "bg-red-50 text-red-700"
+                                : a.status === "COMPLETED"
+                                  ? "bg-blue-50 text-blue-700"
+                                  : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {a.status}
+                        </span>
+                      </div>
+                      {a.status === "CANCELLED" && (
+                        <div className="mt-2 text-sm text-red-700">
+                          Cancelled by{" "}
+                          <strong>
+                            {a.cancelledByName ||
+                              a.cancelledByUser?.name ||
+                              "Unknown"}
+                          </strong>
+                          {a.cancelledAt
+                            ? ` on ${new Date(a.cancelledAt).toLocaleString()}`
+                            : ""}
+                        </div>
+                      )}
                     </div>
                     {a.status === "CONFIRMED" && (
                       <div className="flex gap-2">

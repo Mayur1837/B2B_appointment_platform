@@ -228,9 +228,26 @@ export async function deleteService(req, res) {
         { tenantId: req.tenantId, serviceId: service._id },
         { session },
       );
+      // await Appointment.updateMany(
+      //   { tenantId: req.tenantId, serviceId: service._id, status: "CONFIRMED" },
+      //   { $set: { status: "CANCELLED" } },
+      //   { session },
+      // );
       await Appointment.updateMany(
-        { tenantId: req.tenantId, serviceId: service._id, status: "CONFIRMED" },
-        { $set: { status: "CANCELLED" } },
+        {
+          tenantId: req.tenantId,
+          serviceId: service._id,
+          status: "CONFIRMED",
+        },
+        {
+          $set: {
+            status: "CANCELLED",
+            cancelledAt: new Date(),
+            cancelledByUser: req.user._id,
+            cancelledByRole: "BUSINESS_ADMIN",
+            cancelledByName: req.user.name,
+          },
+        },
         { session },
       );
       const appointments = await Appointment.find({
@@ -268,30 +285,6 @@ export async function listAvailability(req, res) {
   });
 }
 
-// export async function createAvailability(req, res) {
-//   const { serviceId, date, startTime, endTime } = req.body;
-//   if (!(await Service.exists({ _id: serviceId, tenantId: req.tenantId })))
-//     throw new AppError("Service not found", 404);
-//   validateAvailabilityItem({ date, startTime, endTime });
-//   try {
-//     const availability = await Availability.create({
-//       tenantId: req.tenantId,
-//       serviceId,
-//       date,
-//       startTime,
-//       endTime,
-//       active: true,
-//     });
-//     res.status(201).json({ availability });
-//   } catch (error) {
-//     if (error?.code === 11000)
-//       throw new AppError(
-//         "This service already has the same availability window on this date",
-//         409,
-//       );
-//     throw error;
-//   }
-// }
 export async function createAvailability(req, res) {
   const {
     serviceId,
@@ -365,8 +358,12 @@ export async function listAppointments(req, res) {
     q.startAt = { $gte: d, $lt: e };
   }
   res.json({
+    // appointments: await Appointment.find(q)
+    //   .populate("serviceId", "name durationMinutes")
+    //   .sort({ startAt: 1 }),
     appointments: await Appointment.find(q)
       .populate("serviceId", "name durationMinutes")
+      .populate("cancelledByUser", "name email role")
       .sort({ startAt: 1 }),
   });
 }
@@ -404,9 +401,32 @@ export async function updateAppointment(req, res) {
       throw error;
     }
   }
+  // appointment.status = req.body.status;
+  // await appointment.save();
+  // if (req.body.status === "CANCELLED")
+  //   await ReservationSlot.deleteMany({ appointmentId: appointment._id });
   appointment.status = req.body.status;
+
+  if (req.body.status === "CANCELLED") {
+    appointment.cancelledAt = new Date();
+    appointment.cancelledByUser = req.user._id;
+    appointment.cancelledByRole = "BUSINESS_ADMIN";
+    appointment.cancelledByName = req.user.name;
+  }
+
+  if (req.body.status === "CONFIRMED") {
+    appointment.cancelledAt = null;
+    appointment.cancelledByUser = null;
+    appointment.cancelledByRole = null;
+    appointment.cancelledByName = null;
+  }
+
   await appointment.save();
-  if (req.body.status === "CANCELLED")
-    await ReservationSlot.deleteMany({ appointmentId: appointment._id });
+
+  if (req.body.status === "CANCELLED") {
+    await ReservationSlot.deleteMany({
+      appointmentId: appointment._id,
+    });
+  }
   res.json({ appointment });
 }

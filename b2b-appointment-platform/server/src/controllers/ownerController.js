@@ -17,7 +17,8 @@ export async function listBusinesses(req, res) {
   res.json({ businesses: await Business.find().sort({ createdAt: -1 }) });
 }
 export async function createBusiness(req, res) {
-  const { name, email, phone, timezone, adminName, adminEmail, adminPassword } = req.body;
+  const { name, email, phone, timezone, adminName, adminEmail, adminPassword } =
+    req.body;
 
   if (!name?.trim()) throw new AppError("Business name is required", 400);
   if (!adminName?.trim()) throw new AppError("Admin name is required", 400);
@@ -46,14 +47,16 @@ export async function createBusiness(req, res) {
       business = createdBusiness;
 
       await User.create(
-        [{
-          name: adminName.trim(),
-          email: normalizedAdminEmail,
-          passwordHash: await bcrypt.hash(adminPassword, 12),
-          role: "BUSINESS_ADMIN",
-          tenantId: business._id,
-          isActive: true,
-        }],
+        [
+          {
+            name: adminName.trim(),
+            email: normalizedAdminEmail,
+            passwordHash: await bcrypt.hash(adminPassword, 12),
+            role: "BUSINESS_ADMIN",
+            tenantId: business._id,
+            isActive: true,
+          },
+        ],
         { session },
       );
     });
@@ -107,4 +110,72 @@ export async function getBusiness(req, res) {
   const b = await Business.findById(req.params.id);
   if (!b) throw new AppError("Business not found", 404);
   res.json({ business: b });
+}
+export async function listBusinessAppointments(req, res) {
+  const business = await Business.findById(req.params.id)
+    .select("name timezone status slug")
+    .lean();
+
+  if (!business) {
+    throw new AppError("Business not found", 404);
+  }
+
+  const q = {
+    tenantId: business._id,
+  };
+
+  if (req.query.status) {
+    const allowed = ["CONFIRMED", "CANCELLED", "COMPLETED", "NO_SHOW"];
+
+    if (!allowed.includes(req.query.status)) {
+      throw new AppError("Invalid appointment status", 400);
+    }
+
+    q.status = req.query.status;
+  }
+
+  if (req.query.from || req.query.to) {
+    q.startAt = {};
+
+    if (req.query.from) {
+      const from = new Date(req.query.from);
+
+      if (Number.isNaN(from.getTime())) {
+        throw new AppError("Invalid from date", 400);
+      }
+
+      q.startAt.$gte = from;
+    }
+
+    if (req.query.to) {
+      const to = new Date(req.query.to);
+
+      if (Number.isNaN(to.getTime())) {
+        throw new AppError("Invalid to date", 400);
+      }
+
+      q.startAt.$lt = to;
+    }
+  }
+
+  const appointments = await Appointment.find(q)
+    .populate("serviceId", "name durationMinutes")
+    .populate("customerId", "name email")
+    .populate("cancelledByUser", "name email role")
+    .sort({ startAt: -1 })
+    .lean();
+
+  const totals = {
+    total: appointments.length,
+    confirmed: appointments.filter((a) => a.status === "CONFIRMED").length,
+    completed: appointments.filter((a) => a.status === "COMPLETED").length,
+    cancelled: appointments.filter((a) => a.status === "CANCELLED").length,
+    noShow: appointments.filter((a) => a.status === "NO_SHOW").length,
+  };
+
+  res.json({
+    business,
+    appointments,
+    totals,
+  });
 }
