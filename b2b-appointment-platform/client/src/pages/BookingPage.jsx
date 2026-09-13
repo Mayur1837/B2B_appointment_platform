@@ -9,6 +9,16 @@ import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import Loader from "../components/Loader";
 
+const BOOKING_DRAFT_KEY = "bookflow.bookingDraft";
+
+function readBookingDraft() {
+  try {
+    return JSON.parse(sessionStorage.getItem(BOOKING_DRAFT_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
 function todayInZone(timeZone) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -33,18 +43,28 @@ function label(dateOnly, timeZone) {
 
 export default function BookingPage() {
   const { slug } = useParams();
+  const initialDraft = readBookingDraft();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [data, setData] = useState(null);
+  // const [serviceId, setServiceId] = useState(
+  //   searchParams.get("serviceId") || "",
+  // );
   const [serviceId, setServiceId] = useState(
-    searchParams.get("serviceId") || "",
+    searchParams.get("serviceId") || initialDraft?.serviceId || "",
   );
-  const [date, setDate] = useState(searchParams.get("date") || "");
+  // const [date, setDate] = useState(searchParams.get("date") || "");
+  const [date, setDate] = useState(
+    searchParams.get("date") || initialDraft?.date || "",
+  );
   const [calendarStart, setCalendarStart] = useState("");
   const [slots, setSlots] = useState([]);
   const [availability, setAvailability] = useState({});
-  const [selected, setSelected] = useState(searchParams.get("startAt") || "");
+  // const [selected, setSelected] = useState(searchParams.get("startAt") || "");
+  const [selected, setSelected] = useState(
+    searchParams.get("startAt") || initialDraft?.startAt || "",
+  );
   const [booking, setBooking] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -76,37 +96,6 @@ export default function BookingPage() {
     [calendarStart],
   );
 
-  // useEffect(() => {
-  //   if (!data || !serviceId || !date) return;
-  //   let cancelled = false;
-  //   setLoading(true);
-  //   setError("");
-  //   Promise.all(
-  //     calendarDates.map((day) =>
-  //       api(
-  //         `/public/businesses/${slug}/slots?serviceId=${serviceId}&date=${day}`,
-  //       ).then((x) => [day, x.slots || []]),
-  //     ),
-  //   )
-  //     .then((results) => {
-  //       if (cancelled) return;
-  //       const map = Object.fromEntries(results);
-  //       setAvailability(map);
-  //       const daySlots = map[date] || [];
-  //       setSlots(daySlots);
-  //       setSelected((current) =>
-  //         daySlots.some((x) => x.startAt === current)
-  //           ? current
-  //           : daySlots[0]?.startAt || "",
-  //       );
-  //     })
-  //     .catch((e) => !cancelled && setError(e.message))
-  //     .finally(() => !cancelled && setLoading(false));
-  //   return () => {
-  //     cancelled = true;
-  //   };
-  // }, [data, slug, serviceId, date, calendarStart]);
-
   useEffect(() => {
     if (!data || !serviceId || !date) return;
 
@@ -115,7 +104,7 @@ export default function BookingPage() {
     setLoading(true);
     setError("");
     setSlots([]);
-    setSelected("");
+    // setSelected("");
 
     api(`/public/businesses/${slug}/slots?serviceId=${serviceId}&date=${date}`)
       .then((x) => {
@@ -130,10 +119,19 @@ export default function BookingPage() {
           [date]: daySlots,
         }));
 
-        setSelected((current) =>
-          daySlots.some((x) => x.startAt === current) ? current : "",
-        );
+        //   setSelected((current) =>
+        //     daySlots.some((x) => x.startAt === current) ? current : "",
+        //   );
+        // })
+        setSelected((current) => {
+          if (current && daySlots.some((x) => x.startAt === current)) {
+            return current;
+          }
+
+          return daySlots[0]?.startAt || "";
+        });
       })
+
       .catch((e) => {
         if (!cancelled) {
           setError(e.message);
@@ -152,8 +150,28 @@ export default function BookingPage() {
   }, [data, slug, serviceId, date]);
 
   const selectedService = data?.services.find((s) => s._id === serviceId);
+  // const goToCustomerLogin = () => {
+  //   const returnTo = `/book/${slug}?serviceId=${encodeURIComponent(serviceId)}&date=${encodeURIComponent(date)}${selected ? `&startAt=${encodeURIComponent(selected)}` : ""}`;
+  //   navigate(`/customer-login?returnTo=${encodeURIComponent(returnTo)}`);
+  // };
   const goToCustomerLogin = () => {
-    const returnTo = `/book/${slug}?serviceId=${encodeURIComponent(serviceId)}&date=${encodeURIComponent(date)}${selected ? `&startAt=${encodeURIComponent(selected)}` : ""}`;
+    sessionStorage.setItem(
+      BOOKING_DRAFT_KEY,
+      JSON.stringify({
+        slug,
+        serviceId,
+        date,
+        startAt: selected,
+        savedAt: Date.now(),
+      }),
+    );
+
+    const returnTo = `/book/${slug}?serviceId=${encodeURIComponent(
+      serviceId,
+    )}&date=${encodeURIComponent(date)}${
+      selected ? `&startAt=${encodeURIComponent(selected)}` : ""
+    }`;
+
     navigate(`/customer-login?returnTo=${encodeURIComponent(returnTo)}`);
   };
 
@@ -272,9 +290,26 @@ export default function BookingPage() {
                   <select
                     className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3.5"
                     value={serviceId}
+                    // onChange={(e) => {
+                    //   setServiceId(e.target.value);
+                    //   setSelected("");
+                    // }}
                     onChange={(e) => {
-                      setServiceId(e.target.value);
+                      const nextServiceId = e.target.value;
+
+                      setServiceId(nextServiceId);
                       setSelected("");
+
+                      sessionStorage.setItem(
+                        BOOKING_DRAFT_KEY,
+                        JSON.stringify({
+                          slug,
+                          serviceId: nextServiceId,
+                          date,
+                          startAt: "",
+                          savedAt: Date.now(),
+                        }),
+                      );
                     }}
                   >
                     {data.services.map((s) => (
@@ -303,17 +338,28 @@ export default function BookingPage() {
                       <button
                         type="button"
                         key={day}
-                        onClick={() => setDate(day)}
+                        // onClick={() => setDate(day)}
+                        onClick={() => {
+                          setDate(day);
+                          setSelected("");
+
+                          sessionStorage.setItem(
+                            BOOKING_DRAFT_KEY,
+                            JSON.stringify({
+                              slug,
+                              serviceId,
+                              date: day,
+                              startAt: "",
+                              savedAt: Date.now(),
+                            }),
+                          );
+                        }}
                         className={`rounded-xl border p-3 text-left ${date === day ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 hover:bg-slate-50"}`}
                       >
                         <span className="block text-xs opacity-70">
                           {label(day, data.business.timezone)}
                         </span>
-                        {/* <span className="mt-1 block text-xs font-semibold">
-                          {availability[day]?.length
-                            ? `${availability[day].length} times`
-                            : "Unavailable"}
-                        </span> */}
+
                         <span className="mt-1 block text-xs font-semibold">
                           {date === day
                             ? loading
@@ -327,26 +373,7 @@ export default function BookingPage() {
                     ))}
                   </div>
                 </div>
-                {/* <div className="mt-8">
-                  <h2 className="text-lg font-bold">3. Choose a time</h2>
-                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                    {slots.map((s) => (
-                      <button
-                        type="button"
-                        key={s.startAt}
-                        onClick={() => setSelected(s.startAt)}
-                        className={`rounded-xl border p-3 text-sm font-semibold ${selected === s.startAt ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 hover:bg-slate-50"}`}
-                      >
-                        {s.time}
-                      </button>
-                    ))}
-                  </div>
-                  {!slots.length && !loading && (
-                    <div className="mt-3 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
-                      No available times for this service on this date.
-                    </div>
-                  )}
-                </div> */}
+
                 <div className="mt-8">
                   <div className="flex items-center justify-between">
                     <h2 className="text-lg font-bold">3. Choose a time</h2>
@@ -374,7 +401,21 @@ export default function BookingPage() {
                           <button
                             type="button"
                             key={s.startAt}
-                            onClick={() => setSelected(s.startAt)}
+                            // onClick={() => setSelected(s.startAt)}
+                            onClick={() => {
+                              setSelected(s.startAt);
+
+                              sessionStorage.setItem(
+                                BOOKING_DRAFT_KEY,
+                                JSON.stringify({
+                                  slug,
+                                  serviceId,
+                                  date,
+                                  startAt: s.startAt,
+                                  savedAt: Date.now(),
+                                }),
+                              );
+                            }}
                             className={`rounded-xl border p-3 text-sm font-semibold ${
                               selected === s.startAt
                                 ? "border-slate-950 bg-slate-950 text-white"
@@ -444,6 +485,8 @@ export default function BookingPage() {
                             },
                           );
 
+                          // setBooking(x.appointment);
+                          sessionStorage.removeItem(BOOKING_DRAFT_KEY);
                           setBooking(x.appointment);
                         } catch (e) {
                           setError(e.message);

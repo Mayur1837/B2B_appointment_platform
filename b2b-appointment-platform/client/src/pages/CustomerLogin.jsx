@@ -1,12 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+
+const BOOKING_DRAFT_KEY = "bookflow.bookingDraft";
 
 export default function CustomerLogin() {
   const location = useLocation();
   const nav = useNavigate();
   const { setSession } = useAuth();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const existingReturnTo = params.get("returnTo");
+
+    if (existingReturnTo) return;
+
+    try {
+      const draft = JSON.parse(
+        sessionStorage.getItem(BOOKING_DRAFT_KEY) || "null",
+      );
+
+      if (draft?.slug && draft?.serviceId && draft?.date) {
+        const returnTo = `/book/${draft.slug}?serviceId=${encodeURIComponent(
+          draft.serviceId,
+        )}&date=${encodeURIComponent(draft.date)}${
+          draft.startAt ? `&startAt=${encodeURIComponent(draft.startAt)}` : ""
+        }`;
+
+        nav(`/customer-login?returnTo=${encodeURIComponent(returnTo)}`, {
+          replace: true,
+        });
+      }
+    } catch {
+      // Ignore invalid saved booking draft.
+    }
+  }, [location.search, nav]);
   const [mode, setMode] = useState("login");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
@@ -112,11 +140,7 @@ export default function CustomerLogin() {
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
               />
             </label>
-            {/* <button className="mt-6 w-full rounded-lg bg-slate-900 p-3 font-medium text-white">
-              {mode === "login"
-                ? "Continue to booking"
-                : "Create account & continue"}
-            </button> */}
+
             <button
               disabled={busy}
               className="mt-6 w-full rounded-lg bg-slate-900 p-3 font-medium text-white disabled:opacity-50"

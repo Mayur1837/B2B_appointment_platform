@@ -182,8 +182,17 @@ export async function cancelCustomerAppointmentById(req, res) {
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
+      // a.status = "CANCELLED";
+      // await a.save({ session });
+      // await ReservationSlot.deleteMany({ appointmentId: a._id }, { session });
       a.status = "CANCELLED";
+      a.cancelledAt = new Date();
+      a.cancelledByUser = req.user._id;
+      a.cancelledByRole = "CUSTOMER";
+      a.cancelledByName = req.user.name;
+
       await a.save({ session });
+
       await ReservationSlot.deleteMany({ appointmentId: a._id }, { session });
     });
   } finally {
@@ -222,7 +231,16 @@ export async function cancelCustomerAppointment(req, res) {
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
+      // a.status = "CANCELLED";
+      // await a.save({ session });
       a.status = "CANCELLED";
+      a.cancelledAt = new Date();
+      a.cancelledByUser = req.user?.role === "CUSTOMER" ? req.user._id : null;
+      a.cancelledByRole =
+        req.user?.role === "CUSTOMER" ? "CUSTOMER" : "BOOKING_LINK";
+      a.cancelledByName =
+        req.user?.role === "CUSTOMER" ? req.user.name : a.customerName;
+
       await a.save({ session });
       await ReservationSlot.deleteMany({ appointmentId: a._id }, { session });
     });
